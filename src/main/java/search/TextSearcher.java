@@ -102,15 +102,19 @@ protected void init(String fileContents) {
         }
     }
 }
+
 /**
  * Takes filecontents and splits it into different segments to be processed
  * by different threads without over lap. It tries to divide the thread into
  * 4 equal segments. But inorder to avoid split words, if the initial
  * position is not the end of a sentence, it iterates till it finds a fullstop.
- *
+ * <p>
  * Note: This method has scope for improvement. instead of searching for the
  * end of the string, this method can be made to break at the end of a word.
  * However, for simplicity and lack of time, I have taken this approach.
+ * Also, currently the thread size is fixed to 4. However, a smarter approach
+ * would be to decide based on the number of cores available and the size of
+ * the file.
  */
 private List<Integer> findBreakPoints(String fileContents) {
     final int wordCount = fileContents.length();
@@ -118,12 +122,15 @@ private List<Integer> findBreakPoints(String fileContents) {
     List<Integer> positions = new ArrayList<>();
     //First thread always starts at 0
     positions.add(0);
-    for (int i = 0; i < 4; i++) {
-        int breakPoint = i < 3 ? fileContents.indexOf('.', size * i) + 1 :
-                fileContents.length() - 1;
+    for (int i = 0; i <= 3; i++) {
+        int breakPoint = i == 3 ? fileContents.length() - 1 : fileContents
+                .indexOf('.', size * (i + 1)) + 1;
+        if (breakPoint >= fileContents.length()) {
+            positions.add(fileContents.length() - 1);
+            break;
+        }
         positions.add(breakPoint);
     }
-    System.out.println("positions = "+positions);
     return positions;
 
 }
@@ -175,25 +182,33 @@ private Callable<CallableResult> callable(String textArr, int start, int end
  * @return One context string for each time the query word appears in the file.
  */
 public String[] search(String queryWord, int contextWords) {
+    // Contains the positions of the occurrence of the words.
     Set<Integer> positions = new TreeSet<>();
+    //Search individually in the result returned by each thread;
     for (int i = 0; i < threadSize; i++) {
+        // Since only final can be used in lambdas.
         final int threadPosition = i;
         CallableResult result = resultMap.get(i);
+        //Convert incoming query to lower case and search in the map.
+        //The map returns the position of occurrence in the word array.
         Set<Integer> pos = result.getStringPosition().get(queryWord.toLowerCase());
         if (pos != null) {
+            // Add to the positions list.
             positions.addAll(i == 0 ? pos : pos.stream().map(p -> wordCounts.get(threadPosition - 1)
                     + p).collect(Collectors.toSet()));
         }
     }
+    // Fetch the words from the position and context postions
     List<String> strings = (contextWords > 0) ? positions.stream().map(pos ->
             IntStream.rangeClosed(pos - contextWords, pos + contextWords).mapToObj
-                    (p -> p >= 0 && p < words.size() ? words.get(p) : "").collect
-                    (Collectors
-                            .joining(" "))
+                    (p -> p >= 0 && p < words.size() ?
+                            words.get(p).replaceAll("^\\s", "")
+                            : "").collect(Collectors.joining(" "))
     ).map(word -> word.trim().replaceAll(",$", ""))
             .collect(Collectors.toList()) :
             IntStream.range(0, positions.size()).mapToObj(x -> queryWord).collect
                     (Collectors.toList());
+    // Convert it to an array and return.
     return strings.toArray(new String[0]);
 }
 

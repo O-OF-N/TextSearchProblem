@@ -174,7 +174,8 @@ public class TextSearcherTest {
 		expected = new String[] { "and that the existing forms of life",
 									"generation of pre existing forms." };
 		results = searcher.search("existing",3);
-		assertArraysEqual(expected,results);
+        System.out.println(results);
+        assertArraysEqual(expected,results);
 	}
 	
 	/** Overlapping hits should just come back as separate hits. */
