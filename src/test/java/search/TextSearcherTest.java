@@ -71,7 +71,6 @@ public class TextSearcherTest {
 	}
 
 	/** Tests query word with apostrophe. */
-    @Ignore
 	@Test
 	public void testApostropheQuery() throws Exception {
 		String[] expected = { "not indeed to the animal's or plant's own good",
@@ -152,7 +151,6 @@ public class TextSearcherTest {
 	}
 
 	/** Searcher can execute multiple searches after initialization. */
-    @Ignore
 	@Test
 	public void testMultipleSearches() throws Exception {
 		File file = new File(getClass().getClassLoader()
