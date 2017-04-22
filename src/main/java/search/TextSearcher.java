@@ -92,12 +92,12 @@ protected void init(String fileContents) {
 private List<Integer> findBreakPoints(String fileContents) {
     final int wordCount = fileContents.length();
     int size = wordCount / 4;
+    System.out.println("Size = "+fileContents.length());
     List<Integer> positions = new ArrayList<>();
     positions.add(0);
     for (int i = 0; i < 4; i++) {
-        int breakPoint = fileContents.indexOf('.', size * i);
-        breakPoint = breakPoint+1<fileContents.length()
-                ?breakPoint+1:fileContents.length()-1;
+        int breakPoint =i<3?fileContents.indexOf('.', size * i)+1:
+                fileContents.length()-1;
         positions.add(breakPoint);
     }
     System.out.println("breakpoints = ");
@@ -122,6 +122,7 @@ Callable<CallableResult> callable(String textArr, int start, int end
                     found = true;
                 }
             } else if (i == end) {
+                word = word.concat(String.valueOf(textArr.charAt(i)));
                 words.add(word);
                 found = true;
             } else word = word.concat(String.valueOf(textArr.charAt(i)));
@@ -157,7 +158,7 @@ public String[] search(String queryWord, int contextWords) {
     for (int i = 0; i < threadSize; i++) {
         final int threadPosition = i;
         CallableResult result = resultMap.get(i);
-        Set<Integer> pos = result.getStringPosition().get(queryWord);
+        Set<Integer> pos = result.getStringPosition().get(queryWord.toLowerCase());
         if (pos != null) {
             positions.addAll(i == 0 ? pos : pos.stream().map(p -> wordCounts.get(threadPosition - 1)
                     + p).collect(Collectors.toSet()));
@@ -166,8 +167,10 @@ public String[] search(String queryWord, int contextWords) {
     System.out.println("positions = " + positions);
     List<String> strings = (contextWords > 0) ? positions.stream().map(pos ->
             IntStream.rangeClosed(pos - contextWords, pos + contextWords).mapToObj
-                    (p -> words.get(p)).collect(Collectors.joining(" "))
-    ).map(word->word.trim().replaceAll("\\s*\\p{Punct}+\\s*$", ""))
+                    (p -> p>=0 && p<words.size()? words.get(p):"").collect
+                    (Collectors
+                    .joining(" "))
+    ).map(word->word.trim().replaceAll(",$", ""))
             .collect(Collectors.toList()) :
             IntStream.range(0, positions.size()).mapToObj(x -> queryWord).collect
                     (Collectors.toList());

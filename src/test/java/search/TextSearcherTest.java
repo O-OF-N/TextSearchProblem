@@ -84,7 +84,7 @@ public class TextSearcherTest {
 	}
 
 	/** Tests numeric query word. */
-    @Ignore
+	@Ignore
 	@Test
 	public void testNumericQuery() throws Exception {
 		String[] expected = { "enlarged in 1844 into a",
@@ -109,7 +109,6 @@ public class TextSearcherTest {
 	}
 
 	/** Should get same results regardless of case. */
-    @Ignore
 	@Test
 	public void testCaseInsensitiveSearch() throws Exception {
 		String[] expected = {
@@ -130,7 +129,6 @@ public class TextSearcherTest {
 	}
 
 	/** Hit that overlaps file start should still work. */
-    @Ignore
 	@Test
 	public void testNearBeginning() throws Exception {
 		String[] expected = { "I will here give a brief sketch" };
@@ -142,7 +140,6 @@ public class TextSearcherTest {
 	}
 
 	/** Hit that overlaps file end should still work. */
-    @Ignore
 	@Test
 	public void testNearEnd() throws Exception {
 		String[] expected = { "and that the existing forms of life",
@@ -183,7 +180,6 @@ public class TextSearcherTest {
 	}
 	
 	/** Overlapping hits should just come back as separate hits. */
-    @Ignore
 	@Test
 	public void testOverlappingHits() throws Exception {
 		String[] expected = {
@@ -200,7 +196,6 @@ public class TextSearcherTest {
 	}
 
 	/** If no hits, get back an empty array. */
-    @Ignore
 	@Test
 	public void testNoHits() throws Exception {
 		File file = new File(getClass().getClassLoader()
@@ -212,7 +207,6 @@ public class TextSearcherTest {
 	}
 	
 	/** Verify the tokenizer. This should always pass. */
-    @Ignore
 	@Test
 	public void testTokenizer() throws Exception {
 		String input = "123, 789: def";
