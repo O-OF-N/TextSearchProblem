@@ -15,7 +15,6 @@ import java.util.stream.IntStream;
 
 public class TextSearcher {
 
-private final String SPLIT_KEY = " ";
 private int threadSize = 0;
 private List<Integer> wordCounts = new ArrayList<>();
 private Map<Integer, CallableResult> resultMap;
@@ -33,7 +32,7 @@ private Function<Future, Map<Integer, CallableResult>> extractFuture = future
         -> {
     try {
         CallableResult result = (CallableResult) future.get();
-        Map<Integer, CallableResult> m = new HashMap<Integer, CallableResult>();
+        Map<Integer, CallableResult> m = new HashMap();
         m.put(result.getThreadPosition(), result);
         return m;
     } catch (Exception ex) {
@@ -73,7 +72,7 @@ protected void init(String fileContents) {
             ExecutorService executorService = Executors.newFixedThreadPool(threadSize);
             List<Callable<CallableResult>> callables = new ArrayList<>();
 
-            //Initiates the thread pool with the filecontents, where to start,
+            //Initiates the thread pool with the file contents, where to start,
             //where to end and the thread number.
             IntStream.range(0, threadSize).forEach(i ->
                     callables.add(callable(fileContents, positions.get(i),
@@ -95,8 +94,10 @@ protected void init(String fileContents) {
             for (int i = 0; i < threadSize; i++) {
                 runningCount = runningCount + resultMap.get(i).getWords().size();
                 wordCounts.add(runningCount);
+                System.out.println(resultMap.get(i).getWords());
                 words.addAll(resultMap.get(i).getWords());
             }
+            System.out.println(words);
         } catch (Exception ex) {
             ex.printStackTrace();
         }
@@ -109,12 +110,15 @@ protected void init(String fileContents) {
  * 4 equal segments. But inorder to avoid split words, if the initial
  * position is not the end of a sentence, it iterates till it finds a fullstop.
  * <p>
- * Note: This method has scope for improvement. instead of searching for the
+ * TODO: This method has scope for improvement. instead of searching for the
  * end of the string, this method can be made to break at the end of a word.
  * However, for simplicity and lack of time, I have taken this approach.
  * Also, currently the thread size is fixed to 4. However, a smarter approach
  * would be to decide based on the number of cores available and the size of
  * the file.
+ *
+ * @Params: Filecontents
+ * @Returns breakpoints
  */
 private List<Integer> findBreakPoints(String fileContents) {
     final int wordCount = fileContents.length();
@@ -123,19 +127,43 @@ private List<Integer> findBreakPoints(String fileContents) {
     //First thread always starts at 0
     positions.add(0);
     for (int i = 0; i <= 3; i++) {
+        // TODO: This needs to be improved.
+        // Currently it looks for the first fullstop after the expected size
+        // position.
+        // In this case: If "www.google.com" comes after the expected size
+        // position, it will break at www. But www.google.com is a single word.
         int breakPoint = i == 3 ? fileContents.length() - 1 : fileContents
-                .indexOf('.', size * (i + 1)) + 1;
+                .indexOf(".", size * (i + 1)) + 1;
         if (breakPoint >= fileContents.length()) {
             positions.add(fileContents.length() - 1);
             break;
         }
         positions.add(breakPoint);
     }
+    System.out.println(positions);
     return positions;
 
 }
 
-private Callable<CallableResult> callable(String textArr, int start, int end
+/**
+ * Takes the whole text, start, end and thread postions as input.
+ * It does two things:
+ *      1) builds a key value pair, where key is each distinct string and
+ *      value is the position of occurrance of the string with in the segment
+ *      the current thread operates on. This strips all special characters
+ *      and spaces.
+ *      2) builds an array of words retaining special characters and spaces
+ *
+ * @Params: text, Input text
+ * @param: start, start position from where the current thread should operate
+ * @Params: end, the position till which the current string should operate
+ * @Params: threadposition, the index of thread
+ * @Returns future
+
+ */
+
+
+private Callable<CallableResult> callable(String text, int start, int end
         , int threadPosition) {
     return () -> {
         Map<String, Set<Integer>> stringPosition = new HashMap<>();
@@ -143,18 +171,20 @@ private Callable<CallableResult> callable(String textArr, int start, int end
         String word = "";
         boolean found = false;
         for (int i = start; i <= end; i++) {
-            if (textArr.charAt(i) == ' ') {
+            if (text.charAt(i) == ' ') {
                 if (word.trim().length() < 1) {
-                    word = word.concat(String.valueOf(textArr.charAt(i)));
+                    // To eliminate the space added by list.addAll
+                    word = i>start? word.concat(String.valueOf(text.charAt
+                            (i))):"";
                 } else {
                     words.add(word);
                     found = true;
                 }
             } else if (i == end) {
-                word = word.concat(String.valueOf(textArr.charAt(i)));
+                word = word.concat(String.valueOf(text.charAt(i)));
                 words.add(word);
                 found = true;
-            } else word = word.concat(String.valueOf(textArr.charAt(i)));
+            } else word = word.concat(String.valueOf(text.charAt(i)));
             if (found) {
                 String str = word.replaceAll("\\s*\\p{Punct}+\\s*$", "")
                         .toLowerCase();
@@ -202,8 +232,7 @@ public String[] search(String queryWord, int contextWords) {
     List<String> strings = (contextWords > 0) ? positions.stream().map(pos ->
             IntStream.rangeClosed(pos - contextWords, pos + contextWords).mapToObj
                     (p -> p >= 0 && p < words.size() ?
-                            words.get(p).replaceAll("^\\s", "")
-                            : "").collect(Collectors.joining(" "))
+                            words.get(p) : "").collect(Collectors.joining(" "))
     ).map(word -> word.trim().replaceAll(",$", ""))
             .collect(Collectors.toList()) :
             IntStream.range(0, positions.size()).mapToObj(x -> queryWord).collect
