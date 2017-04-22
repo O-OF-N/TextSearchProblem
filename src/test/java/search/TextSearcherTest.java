@@ -13,7 +13,7 @@ import org.junit.Test;
 /** Unit tests for TextSearcher. Don't modify this file. */
 
 public class TextSearcherTest {
-    @Ignore
+
 	public static void assertArraysEqual(Object[] expected, Object[] actual) {
 		// check size first, then contents:
 		Assert.assertEquals(expected.length, actual.length);
@@ -34,7 +34,6 @@ public class TextSearcherTest {
 	}
 	
 	/** Next simplest case, no context and multiple hits. */
-    @Ignore
 	@Test
 	public void testMultipleHitsNoContext() throws Exception {
 		String[] expected = { "naturalists", "naturalists" };
@@ -46,7 +45,6 @@ public class TextSearcherTest {
 	}
 	
 	/** This is the example from the document. */
-    @Ignore
 	@Test
 	public void testBasicSearch() throws Exception {
 		String[] expected = {
@@ -60,7 +58,6 @@ public class TextSearcherTest {
 	}
 
 	/** Same as basic search but a little more context. */
-    @Ignore
 	@Test
 	public void testBasicMoreContext() throws Exception {
 		String[] expected = {

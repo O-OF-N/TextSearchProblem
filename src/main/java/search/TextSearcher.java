@@ -16,6 +16,7 @@ import java.util.stream.IntStream;
 public class TextSearcher {
 
 private final String SPLIT_KEY = " ";
+private List<Integer> wordCounts = new ArrayList<>();
 int threadSize = 0;
 
 Function<Future, Map<Integer, CallableResult>> extractFuture = future -> {
@@ -30,7 +31,7 @@ Function<Future, Map<Integer, CallableResult>> extractFuture = future -> {
     }
 };
 private Map<Integer, CallableResult> resultMap;
-private String[] words;
+private List<String> words = new ArrayList<>();
 
 /**
  * Initializes the text searcher with the contents of a text file.
@@ -60,45 +61,88 @@ public TextSearcher(File f) throws IOException {
 protected void init(String fileContents) {
     synchronized (this) {
         try {
-            words = fileContents.split(SPLIT_KEY);
-            final int wordCount = words.length;
-            threadSize = wordCount >= 4 ? 4 : wordCount;
-            final int wordsPerThread = wordCount / threadSize;
+            List<Integer> positions = findBreakPoints(fileContents);
+            System.out.println("breakPoints = " + positions);
+            threadSize = positions.size() - 1;
             ExecutorService executorService = Executors.newFixedThreadPool(threadSize);
             List<Callable<CallableResult>> callables = new ArrayList<>();
-            IntStream.range(0, threadSize).forEach(i -> {
-                callables.add(callable(words, wordsPerThread * i, wordsPerThread * i + wordsPerThread, i));
-            });
-            resultMap = executorService.invokeAll(callables).stream().map(extractFuture).reduce((m1, m2) -> {
-                m1.putAll(m2);
-                return m1;
-            }).get();
+            IntStream.range(0, threadSize).forEach(i ->
+                    callables.add(callable(fileContents, positions.get(i),
+                            positions.get(i + 1), i)));
+            resultMap = executorService.invokeAll(callables).stream()
+                    .map(extractFuture).reduce((m1, m2) -> {
+                        m1.putAll(m2);
+                        return m1;
+                    }).get();
+            System.out.println(resultMap);
+            int runningCount = 0;
             for (int i = 0; i < threadSize; i++) {
-                System.out.println(resultMap.get(i));
+                runningCount = runningCount + resultMap.get(i).getWords().size();
+                wordCounts.add(runningCount);
+                words.addAll(resultMap.get(i).getWords());
             }
+            System.out.println(wordCounts);
+            System.out.println(words);
         } catch (Exception ex) {
             ex.printStackTrace();
         }
     }
 }
 
-Callable<CallableResult> callable(String[] textArr, int start, int end
+private List<Integer> findBreakPoints(String fileContents) {
+    final int wordCount = fileContents.length();
+    int size = wordCount / 4;
+    List<Integer> positions = new ArrayList<>();
+    positions.add(0);
+    for (int i = 0; i < 4; i++) {
+        int breakPoint = fileContents.indexOf('.', size * i);
+        breakPoint = breakPoint+1<fileContents.length()
+                ?breakPoint+1:fileContents.length()-1;
+        positions.add(breakPoint);
+    }
+    System.out.println("breakpoints = ");
+    System.out.println(positions);
+    return positions;
+
+}
+
+Callable<CallableResult> callable(String textArr, int start, int end
         , int threadPosition) {
     return () -> {
         Map<String, Set<Integer>> stringPosition = new HashMap<>();
+        List<String> words = new ArrayList<>();
+        String word = "";
+        boolean found = false;
         for (int i = start; i <= end; i++) {
-            String str =textArr[i].replaceAll("\\s*\\p{Punct}+\\s*$", "").toLowerCase();
-            Set<Integer> positions = stringPosition.get(str);
-            if (positions == null) {
-                Set<Integer> pos = new HashSet<>();
-                pos.add(i);
-                stringPosition.put(str, pos);
-            } else {
-                positions.add(i);
-                stringPosition.put(str, positions);
+            if (textArr.charAt(i) == ' ') {
+                if (word.trim().length() < 1) {
+                    word = word.concat(String.valueOf(textArr.charAt(i)));
+                } else {
+                    words.add(word);
+                    found = true;
+                }
+            } else if (i == end) {
+                words.add(word);
+                found = true;
+            } else word = word.concat(String.valueOf(textArr.charAt(i)));
+            if (found) {
+                String str = word.replaceAll("\\s*\\p{Punct}+\\s*$", "")
+                        .toLowerCase();
+                Set<Integer> positions = stringPosition.get(str);
+                if (positions == null) {
+                    Set<Integer> pos = new HashSet<>();
+                    pos.add(words.size() - 1);
+                    stringPosition.put(str, pos);
+                } else {
+                    positions.add(words.size() - 1);
+                    stringPosition.put(str, positions);
+                }
+                word = "";
+                found = false;
             }
         }
-        return new CallableResult(stringPosition, threadPosition);
+        System.out.println(words);
+        return new CallableResult(stringPosition, threadPosition, words);
     };
 }
 
@@ -111,50 +155,63 @@ Callable<CallableResult> callable(String[] textArr, int start, int end
 public String[] search(String queryWord, int contextWords) {
     Set<Integer> positions = new TreeSet<>();
     for (int i = 0; i < threadSize; i++) {
+        final int threadPosition = i;
         CallableResult result = resultMap.get(i);
         Set<Integer> pos = result.getStringPosition().get(queryWord);
         if (pos != null) {
-            positions.addAll(pos);
+            positions.addAll(i == 0 ? pos : pos.stream().map(p -> wordCounts.get(threadPosition - 1)
+                    + p).collect(Collectors.toSet()));
         }
     }
-    System.out.println("positions = "+positions);
-    List<String> strings = positions.stream().map(pos ->
+    System.out.println("positions = " + positions);
+    List<String> strings = (contextWords > 0) ? positions.stream().map(pos ->
             IntStream.rangeClosed(pos - contextWords, pos + contextWords).mapToObj
-                    (p -> words[p])
-                    .collect(Collectors.joining(" "))
-    ).collect(Collectors.toList());
+                    (p -> words.get(p)).collect(Collectors.joining(" "))
+    ).map(word->word.trim().replaceAll("\\s*\\p{Punct}+\\s*$", ""))
+            .collect(Collectors.toList()) :
+            IntStream.range(0, positions.size()).mapToObj(x -> queryWord).collect
+                    (Collectors.toList());
+    ;
     System.out.println(strings);
     return strings.toArray(new String[0]);
-}
 }
 
 // Any needed utility classes can just go in this file
 
 class CallableResult {
-private final Map<String, Set<Integer>> stringPosition;
-private final int threadPosition;
+    private final Map<String, Set<Integer>> stringPosition;
+    private final List<String> words;
+    private final int threadPosition;
 
-CallableResult(Map<String, Set<Integer>> stringPosition, int threadPosition) {
-    this.stringPosition = stringPosition;
-    this.threadPosition = threadPosition;
-}
-
-Map<String, Set<Integer>> getStringPosition() {
-    return stringPosition;
-}
-
-int getThreadPosition() {
-    return threadPosition;
-}
-
-@Override
-public String toString() {
-    String s = "";
-    for (Map.Entry entry : stringPosition.entrySet()) {
-        String key = (String) entry.getKey();
-        Set<Integer> values = (Set<Integer>) entry.getValue();
-        s = s.concat(key + "::" + values + System.lineSeparator());
+    CallableResult(Map<String, Set<Integer>> stringPosition, int threadPosition,
+                   List<String> words) {
+        this.stringPosition = stringPosition;
+        this.threadPosition = threadPosition;
+        this.words = words;
     }
-    return s;
+
+    Map<String, Set<Integer>> getStringPosition() {
+        return stringPosition;
+    }
+
+    int getThreadPosition() {
+        return threadPosition;
+    }
+
+    public List<String> getWords() {
+        return words;
+    }
+
+    @Override
+    public String toString() {
+        String s = "";
+        for (Map.Entry entry : stringPosition.entrySet()) {
+            String key = (String) entry.getKey();
+            Set<Integer> values = (Set<Integer>) entry.getValue();
+            s = s.concat(key + "::" + values + System.lineSeparator());
+        }
+        s.concat(System.lineSeparator()+System.lineSeparator());
+        return s;
+    }
 }
 }
