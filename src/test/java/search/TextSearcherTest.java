@@ -83,8 +83,7 @@ public class TextSearcherTest {
 	}
 
 	/** Tests numeric query word. */
-	@Ignore
-	@Test
+ 	@Test
 	public void testNumericQuery() throws Exception {
 		String[] expected = { "enlarged in 1844 into a",
 				"sketch of 1844--honoured me" };
@@ -96,7 +95,6 @@ public class TextSearcherTest {
 	}
 
 	/** Tests mixed alphanumeric query word. */
-    @Ignore
 	@Test
 	public void testMixedQuery() throws Exception {
 		String[] expected = { "date first edition [xxxxx10x.xxx] please check" };
